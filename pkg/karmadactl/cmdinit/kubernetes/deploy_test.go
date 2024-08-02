@@ -18,6 +18,8 @@ package kubernetes
 
 import (
 	"context"
+	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/config"
+	"github.com/stretchr/testify/assert"
 	"net"
 	"os"
 	"testing"
@@ -495,4 +497,97 @@ func TestKarmadaSchedulerImage(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseInitConfig(t *testing.T) {
+	cfg := &config.InitConfiguration{
+		GeneralConfig: config.GeneralConfig{
+			Namespace:                 "test-namespace",
+			KubeConfigPath:            "/path/to/kubeconfig",
+			PrivateImageRegistry:      "test-registry",
+			WaitComponentReadyTimeout: 200,
+		},
+		CertificateConfig: config.CertificateConfig{
+			CertificatesDir: "/path/to/certs",
+			ExternalDNS:     []string{"dns1", "dns2"},
+			ExternalIP:      []string{"1.2.3.4", "5.6.7.8"},
+			ValidityPeriod:  "8760h",
+		},
+		EtcdConfig: config.EtcdConfig{
+			Local: &config.LocalEtcd{
+				Image:              "etcd-image",
+				InitImage:          "init-image",
+				DataDir:            "/data/dir",
+				PVCSize:            "5Gi",
+				NodeSelectorLabels: "key=value",
+				StorageMode:        "PVC",
+				Replicas:           3,
+			},
+		},
+		ControlPlaneConfig: config.ControlPlaneConfig{
+			APIServer: config.APIServerConfig{
+				Image:            "apiserver-image",
+				AdvertiseAddress: "192.168.1.1",
+				Replicas:         2,
+			},
+		},
+		ImageConfig: config.ImageConfig{
+			KubeImageRegistry:      "registry",
+			KubeImageMirrorCountry: "cn",
+			ImagePullPolicy:        "IfNotPresent",
+			ImagePullSecrets:       []string{"secret1", "secret2"},
+		},
+	}
+
+	opt := &CommandInitOption{}
+	err := opt.parseInitConfig(cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, "test-namespace", opt.Namespace)
+	assert.Equal(t, "/path/to/kubeconfig", opt.KubeConfig)
+	assert.Equal(t, "test-registry", opt.ImageRegistry)
+	assert.Equal(t, 200, opt.WaitComponentReadyTimeout)
+	assert.Equal(t, "/path/to/certs", opt.KarmadaPkiPath)
+	assert.Equal(t, "dns1,dns2", opt.ExternalDNS)
+	assert.Equal(t, "1.2.3.4,5.6.7.8", opt.ExternalIP)
+	assert.Equal(t, parseDuration("8760h"), opt.CertValidity)
+	assert.Equal(t, "etcd-image", opt.EtcdImage)
+	assert.Equal(t, "init-image", opt.EtcdInitImage)
+	assert.Equal(t, "/data/dir", opt.EtcdHostDataPath)
+	assert.Equal(t, "5Gi", opt.EtcdPersistentVolumeSize)
+	assert.Equal(t, "key=value", opt.EtcdNodeSelectorLabels)
+	assert.Equal(t, "PVC", opt.EtcdStorageMode)
+	assert.Equal(t, int32(3), opt.EtcdReplicas)
+	assert.Equal(t, "apiserver-image", opt.KarmadaAPIServerImage)
+	assert.Equal(t, "192.168.1.1", opt.KarmadaAPIServerAdvertiseAddress)
+	assert.Equal(t, int32(2), opt.KarmadaAPIServerReplicas)
+	assert.Equal(t, "registry", opt.KubeImageRegistry)
+	assert.Equal(t, "cn", opt.KubeImageMirrorCountry)
+	assert.Equal(t, "IfNotPresent", opt.ImagePullPolicy)
+	assert.Equal(t, []string{"secret1", "secret2"}, opt.PullSecrets)
+}
+
+func TestParseInitConfig_MissingFields(t *testing.T) {
+	cfg := &config.InitConfiguration{
+		GeneralConfig: config.GeneralConfig{
+			Namespace: "test-namespace",
+		},
+	}
+
+	opt := &CommandInitOption{}
+	err := opt.parseInitConfig(cfg)
+	assert.NoError(t, err)
+	assert.Equal(t, "test-namespace", opt.Namespace)
+	assert.Empty(t, opt.KubeConfig)
+}
+
+func TestParseInitConfig_InvalidConfig(t *testing.T) {
+	cfg := &config.InitConfiguration{
+		GeneralConfig: config.GeneralConfig{
+			Namespace: "",
+		},
+	}
+
+	opt := &CommandInitOption{}
+	err := opt.parseInitConfig(cfg)
+	assert.Error(t, err)
 }

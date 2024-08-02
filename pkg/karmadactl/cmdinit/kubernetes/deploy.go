@@ -36,6 +36,7 @@ import (
 	netutils "k8s.io/utils/net"
 
 	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/cert"
+	initConfig "github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/config"
 	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/karmada"
 	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/options"
 	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/utils"
@@ -173,6 +174,7 @@ type CommandInitOption struct {
 	WaitComponentReadyTimeout          int
 	CaCertFile                         string
 	CaKeyFile                          string
+	KarmadaInitFilePath                string
 }
 
 func (i *CommandInitOption) validateLocalEtcd(parentCommand string) error {
@@ -222,6 +224,16 @@ func (i *CommandInitOption) isExternalEtcdProvided() bool {
 
 // Validate Check that there are enough flags to run the command.
 func (i *CommandInitOption) Validate(parentCommand string) error {
+	if i.KarmadaInitFilePath != "" {
+		cfg, err := initConfig.LoadInitConfiguration(i.KarmadaInitFilePath)
+		if err != nil {
+			return fmt.Errorf("failed to load karmada init configuration: %v", err)
+		}
+		if err := i.parseInitConfig(cfg); err != nil {
+			return fmt.Errorf("failed to parse karmada init configuration: %v", err)
+		}
+	}
+
 	if i.KarmadaAPIServerAdvertiseAddress != "" {
 		if netutils.ParseIPSloppy(i.KarmadaAPIServerAdvertiseAddress) == nil {
 			return fmt.Errorf("karmada apiserver advertise address is not valid")
@@ -712,6 +724,93 @@ func (i *CommandInitOption) getImagePullSecrets() []corev1.LocalObjectReference 
 		imagePullSecrets = append(imagePullSecrets, secret)
 	}
 	return imagePullSecrets
+}
+
+// parseInitConfig 将 InitConfiguration 中的字段解析到 CommandInitOption 中
+func (i *CommandInitOption) parseInitConfig(cfg *initConfig.InitConfiguration) error {
+	// General Config
+	setIfNotEmpty(&i.Namespace, cfg.GeneralConfig.Namespace)
+	setIfNotEmpty(&i.KubeConfig, cfg.GeneralConfig.KubeConfigPath)
+	setIfNotEmpty(&i.ImageRegistry, cfg.GeneralConfig.PrivateImageRegistry)
+	setIfNotZero(&i.WaitComponentReadyTimeout, cfg.GeneralConfig.WaitComponentReadyTimeout)
+
+	// Certificate Config
+	setIfNotEmpty(&i.KarmadaPkiPath, cfg.CertificateConfig.CertificatesDir)
+	if len(cfg.CertificateConfig.ExternalDNS) > 0 {
+		i.ExternalDNS = joinStringSlice(cfg.CertificateConfig.ExternalDNS)
+	}
+	if len(cfg.CertificateConfig.ExternalIP) > 0 {
+		i.ExternalIP = joinStringSlice(cfg.CertificateConfig.ExternalIP)
+	}
+	if cfg.CertificateConfig.ValidityPeriod != "" {
+		i.CertValidity = parseDuration(cfg.CertificateConfig.ValidityPeriod)
+	}
+
+	// Etcd Config
+	if cfg.EtcdConfig.Local != nil {
+		setIfNotEmpty(&i.EtcdImage, cfg.EtcdConfig.Local.Image)
+		setIfNotEmpty(&i.EtcdInitImage, cfg.EtcdConfig.Local.InitImage)
+		setIfNotEmpty(&i.EtcdHostDataPath, cfg.EtcdConfig.Local.DataDir)
+		setIfNotEmpty(&i.EtcdPersistentVolumeSize, cfg.EtcdConfig.Local.PVCSize)
+		setIfNotEmpty(&i.EtcdNodeSelectorLabels, cfg.EtcdConfig.Local.NodeSelectorLabels)
+		setIfNotEmpty(&i.EtcdStorageMode, cfg.EtcdConfig.Local.StorageMode)
+		setIfNotZeroInt32(&i.EtcdReplicas, cfg.EtcdConfig.Local.Replicas)
+	} else if cfg.EtcdConfig.External != nil {
+		setIfNotEmpty(&i.ExternalEtcdCACertPath, cfg.EtcdConfig.External.ExternalCAPath)
+		setIfNotEmpty(&i.ExternalEtcdClientCertPath, cfg.EtcdConfig.External.ExternalCertPath)
+		setIfNotEmpty(&i.ExternalEtcdClientKeyPath, cfg.EtcdConfig.External.ExternalKeyPath)
+		setIfNotEmpty(&i.ExternalEtcdServers, cfg.EtcdConfig.External.ExternalServers)
+		setIfNotEmpty(&i.ExternalEtcdKeyPrefix, cfg.EtcdConfig.External.ExternalPrefix)
+	}
+
+	// Control Plane Config
+	setIfNotEmpty(&i.KarmadaAPIServerImage, cfg.ControlPlaneConfig.APIServer.Image)
+	setIfNotZeroInt32(&i.KarmadaAPIServerReplicas, cfg.ControlPlaneConfig.APIServer.Replicas)
+	setIfNotEmpty(&i.KarmadaAPIServerAdvertiseAddress, cfg.ControlPlaneConfig.APIServer.AdvertiseAddress)
+
+	setIfNotEmpty(&i.KubeControllerManagerImage, cfg.ControlPlaneConfig.ControllerManager.Image)
+	setIfNotZeroInt32(&i.KubeControllerManagerReplicas, cfg.ControlPlaneConfig.ControllerManager.Replicas)
+
+	setIfNotEmpty(&i.KarmadaSchedulerImage, cfg.ControlPlaneConfig.Scheduler.Image)
+	setIfNotZeroInt32(&i.KarmadaSchedulerReplicas, cfg.ControlPlaneConfig.Scheduler.Replicas)
+
+	setIfNotEmpty(&i.KarmadaWebhookImage, cfg.ControlPlaneConfig.Webhook.Image)
+	setIfNotZeroInt32(&i.KarmadaWebhookReplicas, cfg.ControlPlaneConfig.Webhook.Replicas)
+
+	return nil
+}
+
+// setIfNotEmpty 检查源字符串是否为空，如果不为空则将其值赋给目标字符串
+func setIfNotEmpty(dest *string, src string) {
+	if src != "" {
+		*dest = src
+	}
+}
+
+// setIfNotZero 检查源整数是否为零，如果不为零则将其值赋给目标整数
+func setIfNotZero(dest *int, src int) {
+	if src != 0 {
+		*dest = src
+	}
+}
+
+// setIfNotZeroInt32 检查源int32是否为零，如果不为零则将其值赋给目标int32
+func setIfNotZeroInt32(dest *int32, src int32) {
+	if src != 0 {
+		*dest = src
+	}
+}
+
+func joinStringSlice(slice []string) string {
+	return strings.Join(slice, ",")
+}
+
+func parseDuration(durationStr string) time.Duration {
+	duration, err := time.ParseDuration(durationStr)
+	if err != nil {
+		return 0
+	}
+	return duration
 }
 
 func generateServerURL(serverIP string, nodePort int32) (string, error) {
