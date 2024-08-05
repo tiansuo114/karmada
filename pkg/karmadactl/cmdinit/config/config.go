@@ -1,20 +1,33 @@
+/*
+Copyright 2024 The Karmada Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package config
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"github.com/pkg/errors"
-	"io"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	yamlserializer "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
-	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
 	"os"
 	"sort"
 )
 
+// LoadInitConfiguration loads the InitConfiguration from the specified file path.
+// It delegates the actual loading to the loadInitConfigurationFromFile function.
 func LoadInitConfiguration(cfgPath string) (*InitConfiguration, error) {
 	var config *InitConfiguration
 	var err error
@@ -24,6 +37,8 @@ func LoadInitConfiguration(cfgPath string) (*InitConfiguration, error) {
 	return config, err
 }
 
+// loadInitConfigurationFromFile reads the file at the specified path and converts it into an InitConfiguration.
+// It reads the file contents and then converts the bytes to an InitConfiguration.
 func loadInitConfigurationFromFile(cfgPath string) (*InitConfiguration, error) {
 	klog.V(1).Infof("loading configuration from %q", cfgPath)
 
@@ -35,8 +50,10 @@ func loadInitConfigurationFromFile(cfgPath string) (*InitConfiguration, error) {
 	return BytesToInitConfiguration(b)
 }
 
+// BytesToInitConfiguration parses the given byte slice into an InitConfiguration.
+// It first converts the bytes to a map of GroupVersionKind to bytes, then processes this map to extract the InitConfiguration.
 func BytesToInitConfiguration(b []byte) (*InitConfiguration, error) {
-	gvkmap, err := SplitYAMLDocuments(b)
+	gvkmap, err := ParseGVKYamlMap(b)
 	if err != nil {
 		return nil, err
 	}
@@ -44,42 +61,25 @@ func BytesToInitConfiguration(b []byte) (*InitConfiguration, error) {
 	return documentMapToInitConfiguration(gvkmap)
 }
 
-func SplitYAMLDocuments(yamlBytes []byte) (map[schema.GroupVersionKind][]byte, error) {
+// ParseGVKYamlMap parses a single YAML document into a map of GroupVersionKind to byte slices.
+// This function is a simplified version that handles only a single YAML document.
+func ParseGVKYamlMap(yamlBytes []byte) (map[schema.GroupVersionKind][]byte, error) {
 	gvkmap := make(map[schema.GroupVersionKind][]byte)
-	knownKinds := map[string]bool{}
-	errs := []error{}
-	buf := bytes.NewBuffer(yamlBytes)
-	reader := yaml.NewYAMLReader(bufio.NewReader(buf))
-	for {
-		b, err := reader.Read()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-		if len(b) == 0 {
-			break
-		}
-		gvk, err := yamlserializer.DefaultMetaFactory.Interpret(b)
-		if err != nil {
-			return nil, err
-		}
-		if len(gvk.Group) == 0 || len(gvk.Version) == 0 || len(gvk.Kind) == 0 {
-			return nil, errors.Errorf("invalid configuration for GroupVersionKind %+v: kind and apiVersion is mandatory information that must be specified", gvk)
-		}
-		if known := knownKinds[gvk.Kind]; known {
-			errs = append(errs, errors.Errorf("invalid configuration: kind %q is specified twice in YAML file", gvk.Kind))
-			continue
-		}
-		knownKinds[gvk.Kind] = true
-		gvkmap[*gvk] = b
+
+	gvk, err := yamlserializer.DefaultMetaFactory.Interpret(yamlBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to interpret YAML document")
 	}
-	if err := errorsutil.NewAggregate(errs); err != nil {
-		return nil, err
+	if len(gvk.Group) == 0 || len(gvk.Version) == 0 || len(gvk.Kind) == 0 {
+		return nil, errors.Errorf("invalid configuration for GroupVersionKind %+v: kind and apiVersion is mandatory information that must be specified", gvk)
 	}
+	gvkmap[*gvk] = yamlBytes
+
 	return gvkmap, nil
 }
 
+// documentMapToInitConfiguration processes a map of GroupVersionKind to byte slices to extract the InitConfiguration.
+// It iterates over the map, looking for the "InitConfiguration" kind and unmarshals its content into an InitConfiguration object.
 func documentMapToInitConfiguration(gvkmap map[schema.GroupVersionKind][]byte) (*InitConfiguration, error) {
 	var initcfg *InitConfiguration
 

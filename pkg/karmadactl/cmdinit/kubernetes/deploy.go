@@ -726,7 +726,7 @@ func (i *CommandInitOption) getImagePullSecrets() []corev1.LocalObjectReference 
 	return imagePullSecrets
 }
 
-// parseInitConfig 将 InitConfiguration 中的字段解析到 CommandInitOption 中
+// parseInitConfig parses fields from InitConfiguration into CommandInitOption.
 func (i *CommandInitOption) parseInitConfig(cfg *initConfig.InitConfiguration) error {
 	// General Config
 	setIfNotEmpty(&i.Namespace, cfg.GeneralConfig.Namespace)
@@ -780,31 +780,34 @@ func (i *CommandInitOption) parseInitConfig(cfg *initConfig.InitConfiguration) e
 	return nil
 }
 
-// setIfNotEmpty 检查源字符串是否为空，如果不为空则将其值赋给目标字符串
+// setIfNotEmpty checks if the source string is not empty, and if so, assigns its value to the destination string.
 func setIfNotEmpty(dest *string, src string) {
 	if src != "" {
 		*dest = src
 	}
 }
 
-// setIfNotZero 检查源整数是否为零，如果不为零则将其值赋给目标整数
+// setIfNotZero checks if the source integer is not zero, and if so, assigns its value to the destination integer.
 func setIfNotZero(dest *int, src int) {
 	if src != 0 {
 		*dest = src
 	}
 }
 
-// setIfNotZeroInt32 检查源int32是否为零，如果不为零则将其值赋给目标int32
+// setIfNotZeroInt32 checks if the source int32 is not zero, and if so, assigns its value to the destination int32.
 func setIfNotZeroInt32(dest *int32, src int32) {
 	if src != 0 {
 		*dest = src
 	}
 }
 
+// joinStringSlice joins a slice of strings into a single string separated by commas.
 func joinStringSlice(slice []string) string {
 	return strings.Join(slice, ",")
 }
 
+// parseDuration parses a duration string and returns the corresponding time.Duration value.
+// If the parsing fails, it returns a duration of 0.
 func parseDuration(durationStr string) time.Duration {
 	duration, err := time.ParseDuration(durationStr)
 	if err != nil {
