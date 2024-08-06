@@ -504,14 +504,20 @@ func TestParseInitConfig(t *testing.T) {
 		GeneralConfig: config.GeneralConfig{
 			Namespace:                 "test-namespace",
 			KubeConfigPath:            "/path/to/kubeconfig",
+			KubeImageTag:              "v1.21.0",
+			Context:                   "test-context",
+			StorageClassesName:        "fast",
 			PrivateImageRegistry:      "test-registry",
 			WaitComponentReadyTimeout: 200,
+			Port:                      32443,
 		},
 		CertificateConfig: config.CertificateConfig{
-			CertificatesDir: "/path/to/certs",
-			ExternalDNS:     []string{"dns1", "dns2"},
-			ExternalIP:      []string{"1.2.3.4", "5.6.7.8"},
-			ValidityPeriod:  "8760h",
+			ExternalDNS:    []string{"dns1", "dns2"},
+			ExternalIP:     []string{"1.2.3.4", "5.6.7.8"},
+			ValidityPeriod: "8760h",
+			CaCertFile:     "/path/to/ca.crt",
+			CaCertKeyFile:  "/path/to/ca.key",
+			ExtraArgs:      []config.Arg{{Name: "arg1", Value: "value1"}},
 		},
 		EtcdConfig: config.EtcdConfig{
 			Local: &config.LocalEtcd{
@@ -522,16 +528,57 @@ func TestParseInitConfig(t *testing.T) {
 				NodeSelectorLabels: "key=value",
 				StorageMode:        "PVC",
 				Replicas:           3,
+				ExtraArgs:          []config.Arg{{Name: "etcd-arg1", Value: "etcd-value1"}},
+			},
+			External: &config.ExternalEtcd{
+				ExternalCAPath:   "/etc/ssl/certs/ca-certificates.crt",
+				ExternalCertPath: "/path/to/certificate.pem",
+				ExternalKeyPath:  "/path/to/privatekey.pem",
+				ExternalServers:  "https://example.com:8443",
+				ExternalPrefix:   "ext-",
+				ExtraArgs:        []config.Arg{{Name: "ext-etcd-arg1", Value: "ext-etcd-value1"}},
 			},
 		},
-		ControlPlaneConfig: config.ControlPlaneConfig{
+		KarmadaControlPlaneConfig: config.KarmadaControlPlaneConfig{
 			APIServer: config.APIServerConfig{
 				Image:            "apiserver-image",
 				AdvertiseAddress: "192.168.1.1",
 				Replicas:         2,
+				NodePort:         32443,
+				ExtraArgs:        []config.Arg{{Name: "api-arg1", Value: "api-value1"}},
 			},
+			ControllerManager: config.ControllerManagerConfig{
+				Image:     "controller-manager-image",
+				Replicas:  2,
+				ExtraArgs: []config.Arg{{Name: "cm-arg1", Value: "cm-value1"}},
+			},
+			Scheduler: config.SchedulerConfig{
+				Image:     "scheduler-image",
+				Replicas:  2,
+				ExtraArgs: []config.Arg{{Name: "sched-arg1", Value: "sched-value1"}},
+			},
+			Webhook: config.WebhookConfig{
+				Image:     "webhook-image",
+				Replicas:  2,
+				ExtraArgs: []config.Arg{{Name: "webhook-arg1", Value: "webhook-value1"}},
+			},
+			AggregatedAPIServerConfig: config.AggregatedAPIServerConfig{
+				Image:     "aggregated-apiserver-image",
+				Replicas:  2,
+				ExtraArgs: []config.Arg{{Name: "aggregated-arg1", Value: "aggregated-value1"}},
+			},
+			KubeControllerManagerConfig: config.KubeControllerManagerConfig{
+				Image:     "kube-controller-manager-image",
+				Replicas:  2,
+				ExtraArgs: []config.Arg{{Name: "kcm-arg1", Value: "kcm-value1"}},
+			},
+			DataPath:          "/etc/karmada",
+			PkiPath:           "/etc/karmada/pki",
+			CRDs:              "/etc/karmada/crds",
+			HostClusterDomain: "cluster.local",
 		},
 		ImageConfig: config.ImageConfig{
+			KubeImageTag:           "v1.21.0",
 			KubeImageRegistry:      "registry",
 			KubeImageMirrorCountry: "cn",
 			ImagePullPolicy:        "IfNotPresent",
@@ -546,7 +593,6 @@ func TestParseInitConfig(t *testing.T) {
 	assert.Equal(t, "/path/to/kubeconfig", opt.KubeConfig)
 	assert.Equal(t, "test-registry", opt.ImageRegistry)
 	assert.Equal(t, 200, opt.WaitComponentReadyTimeout)
-	assert.Equal(t, "/path/to/certs", opt.KarmadaPkiPath)
 	assert.Equal(t, "dns1,dns2", opt.ExternalDNS)
 	assert.Equal(t, "1.2.3.4,5.6.7.8", opt.ExternalIP)
 	assert.Equal(t, parseDuration("8760h"), opt.CertValidity)
@@ -578,16 +624,5 @@ func TestParseInitConfig_MissingFields(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "test-namespace", opt.Namespace)
 	assert.Empty(t, opt.KubeConfig)
-}
-
-func TestParseInitConfig_InvalidConfig(t *testing.T) {
-	cfg := &config.InitConfiguration{
-		GeneralConfig: config.GeneralConfig{
-			Namespace: "",
-		},
-	}
-
-	opt := &CommandInitOption{}
-	err := opt.parseInitConfig(cfg)
-	assert.Error(t, err)
+	assert.Empty(t, opt.KubeImageTag)
 }

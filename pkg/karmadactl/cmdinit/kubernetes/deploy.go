@@ -731,17 +731,20 @@ func (i *CommandInitOption) parseInitConfig(cfg *initConfig.InitConfiguration) e
 	// General Config
 	setIfNotEmpty(&i.Namespace, cfg.GeneralConfig.Namespace)
 	setIfNotEmpty(&i.KubeConfig, cfg.GeneralConfig.KubeConfigPath)
+	setIfNotEmpty(&i.KubeImageTag, cfg.GeneralConfig.KubeImageTag)
 	setIfNotEmpty(&i.KubeImageRegistry, cfg.ImageConfig.KubeImageRegistry)
 	setIfNotEmpty(&i.KubeImageMirrorCountry, cfg.ImageConfig.KubeImageMirrorCountry)
 	setIfNotEmpty(&i.ImageRegistry, cfg.GeneralConfig.PrivateImageRegistry)
 	setIfNotEmpty(&i.ImagePullPolicy, cfg.ImageConfig.ImagePullPolicy)
+	setIfNotEmpty(&i.Context, cfg.GeneralConfig.Context)
 	if len(cfg.ImageConfig.ImagePullSecrets) != 0 {
 		i.PullSecrets = cfg.ImageConfig.ImagePullSecrets
 	}
 	setIfNotZero(&i.WaitComponentReadyTimeout, cfg.GeneralConfig.WaitComponentReadyTimeout)
 
 	// Certificate Config
-	setIfNotEmpty(&i.KarmadaPkiPath, cfg.CertificateConfig.CertificatesDir)
+	setIfNotEmpty(&i.CaKeyFile, cfg.CertificateConfig.CaCertKeyFile)
+	setIfNotEmpty(&i.CaCertFile, cfg.CertificateConfig.CaCertFile)
 	if len(cfg.CertificateConfig.ExternalDNS) > 0 {
 		i.ExternalDNS = joinStringSlice(cfg.CertificateConfig.ExternalDNS)
 	}
@@ -770,18 +773,30 @@ func (i *CommandInitOption) parseInitConfig(cfg *initConfig.InitConfiguration) e
 	}
 
 	// Control Plane Config
-	setIfNotEmpty(&i.KarmadaAPIServerImage, cfg.ControlPlaneConfig.APIServer.Image)
-	setIfNotZeroInt32(&i.KarmadaAPIServerReplicas, cfg.ControlPlaneConfig.APIServer.Replicas)
-	setIfNotEmpty(&i.KarmadaAPIServerAdvertiseAddress, cfg.ControlPlaneConfig.APIServer.AdvertiseAddress)
+	setIfNotEmpty(&i.KarmadaAPIServerImage, cfg.KarmadaControlPlaneConfig.APIServer.Image)
+	setIfNotZeroInt32(&i.KarmadaAPIServerReplicas, cfg.KarmadaControlPlaneConfig.APIServer.Replicas)
+	setIfNotEmpty(&i.KarmadaAPIServerAdvertiseAddress, cfg.KarmadaControlPlaneConfig.APIServer.AdvertiseAddress)
+	setIfNotZeroInt32(&i.KarmadaAPIServerNodePort, cfg.KarmadaControlPlaneConfig.APIServer.NodePort)
 
-	setIfNotEmpty(&i.KubeControllerManagerImage, cfg.ControlPlaneConfig.ControllerManager.Image)
-	setIfNotZeroInt32(&i.KubeControllerManagerReplicas, cfg.ControlPlaneConfig.ControllerManager.Replicas)
+	setIfNotEmpty(&i.KarmadaControllerManagerImage, cfg.KarmadaControlPlaneConfig.ControllerManager.Image)
+	setIfNotZeroInt32(&i.KarmadaControllerManagerReplicas, cfg.KarmadaControlPlaneConfig.ControllerManager.Replicas)
 
-	setIfNotEmpty(&i.KarmadaSchedulerImage, cfg.ControlPlaneConfig.Scheduler.Image)
-	setIfNotZeroInt32(&i.KarmadaSchedulerReplicas, cfg.ControlPlaneConfig.Scheduler.Replicas)
+	setIfNotEmpty(&i.KarmadaSchedulerImage, cfg.KarmadaControlPlaneConfig.Scheduler.Image)
+	setIfNotZeroInt32(&i.KarmadaSchedulerReplicas, cfg.KarmadaControlPlaneConfig.Scheduler.Replicas)
 
-	setIfNotEmpty(&i.KarmadaWebhookImage, cfg.ControlPlaneConfig.Webhook.Image)
-	setIfNotZeroInt32(&i.KarmadaWebhookReplicas, cfg.ControlPlaneConfig.Webhook.Replicas)
+	setIfNotEmpty(&i.KarmadaWebhookImage, cfg.KarmadaControlPlaneConfig.Webhook.Image)
+	setIfNotZeroInt32(&i.KarmadaWebhookReplicas, cfg.KarmadaControlPlaneConfig.Webhook.Replicas)
+
+	setIfNotEmpty(&i.KarmadaAggregatedAPIServerImage, cfg.KarmadaControlPlaneConfig.AggregatedAPIServerConfig.Image)
+	setIfNotZeroInt32(&i.KarmadaAggregatedAPIServerReplicas, cfg.KarmadaControlPlaneConfig.AggregatedAPIServerConfig.Replicas)
+
+	setIfNotEmpty(&i.KubeControllerManagerImage, cfg.KarmadaControlPlaneConfig.KubeControllerManagerConfig.Image)
+	setIfNotZeroInt32(&i.KubeControllerManagerReplicas, cfg.KarmadaControlPlaneConfig.KubeControllerManagerConfig.Replicas)
+
+	setIfNotEmpty(&i.KarmadaDataPath, cfg.KarmadaControlPlaneConfig.DataPath)
+	setIfNotEmpty(&i.KarmadaPkiPath, cfg.KarmadaControlPlaneConfig.PkiPath)
+	setIfNotEmpty(&i.CRDs, cfg.KarmadaControlPlaneConfig.CRDs)
+	setIfNotEmpty(&i.HostClusterDomain, cfg.KarmadaControlPlaneConfig.HostClusterDomain)
 
 	return nil
 }

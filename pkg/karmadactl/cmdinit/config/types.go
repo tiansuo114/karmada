@@ -31,8 +31,8 @@ type InitConfiguration struct {
 	// EtcdConfig contains configuration for etcd.
 	EtcdConfig EtcdConfig `yaml:"etcdConfig"`
 
-	// ControlPlaneConfig contains control plane configurations.
-	ControlPlaneConfig ControlPlaneConfig `yaml:"controlPlaneConfig"`
+	// KarmadaControlPlaneConfig contains control plane configurations.
+	KarmadaControlPlaneConfig KarmadaControlPlaneConfig `yaml:"karmadaControlPlaneConfig"`
 
 	// ImageConfig contains image-related configurations.
 	ImageConfig ImageConfig `yaml:"imageConfig"`
@@ -42,18 +42,22 @@ type InitConfiguration struct {
 type GeneralConfig struct {
 	Namespace                 string `yaml:"namespace"`
 	KubeConfigPath            string `yaml:"kubeConfigPath"`
+	KubeImageTag              string `yaml:"kubeImageTag"`
+	Context                   string `yaml:"context"`
 	PrivateImageRegistry      string `yaml:"privateImageRegistry"`
 	WaitComponentReadyTimeout int    `yaml:"waitComponentReadyTimeout"`
 	Port                      int    `yaml:"port"`
+	StorageClassesName        string `yaml:"storageClassesName"`
 }
 
 // CertificateConfig contains certificate-related configuration.
 type CertificateConfig struct {
-	CertificatesDir string   `yaml:"certificatesDir"`
-	ExternalDNS     []string `yaml:"externalDNS"`
-	ExternalIP      []string `yaml:"externalIP"`
-	ValidityPeriod  string   `yaml:"validityPeriod"`
-	ExtraArgs       []Arg    `yaml:"extraArgs"`
+	ExternalDNS    []string `yaml:"externalDNS"`
+	ExternalIP     []string `yaml:"externalIP"`
+	ValidityPeriod string   `yaml:"validityPeriod"`
+	CaCertFile     string   `yaml:"caCertFile"`
+	CaCertKeyFile  string   `yaml:"caCertKeyFile"`
+	ExtraArgs      []Arg    `yaml:"extraArgs"`
 }
 
 // EtcdConfig contains etcd configuration parameters.
@@ -84,12 +88,18 @@ type ExternalEtcd struct {
 	ExtraArgs        []Arg  `yaml:"extraArgs"`
 }
 
-// ControlPlaneConfig contains configuration for the control plane components.
-type ControlPlaneConfig struct {
-	APIServer         APIServerConfig         `yaml:"apiServer"`
-	ControllerManager ControllerManagerConfig `yaml:"controllerManager"`
-	Scheduler         SchedulerConfig         `yaml:"scheduler"`
-	Webhook           WebhookConfig           `yaml:"webhook"`
+// KarmadaControlPlaneConfig contains configuration for the control plane components.
+type KarmadaControlPlaneConfig struct {
+	APIServer                   APIServerConfig             `yaml:"apiServer"`
+	ControllerManager           ControllerManagerConfig     `yaml:"controllerManager"`
+	Scheduler                   SchedulerConfig             `yaml:"scheduler"`
+	Webhook                     WebhookConfig               `yaml:"webhook"`
+	AggregatedAPIServerConfig   AggregatedAPIServerConfig   `yaml:"aggregatedAPIServerConfig"`
+	KubeControllerManagerConfig KubeControllerManagerConfig `yaml:"kubeControllerManagerConfig"`
+	DataPath                    string                      `yaml:"dataPath"`
+	PkiPath                     string                      `yaml:"pkiPath"`
+	CRDs                        string                      `yaml:"crds"`
+	HostClusterDomain           string                      `yaml:"hostClusterDomain"`
 }
 
 // APIServerConfig contains configuration for the API server.
@@ -97,6 +107,7 @@ type APIServerConfig struct {
 	Image            string `yaml:"image"`
 	AdvertiseAddress string `yaml:"advertiseAddress"`
 	Replicas         int32  `yaml:"replicas"`
+	NodePort         int32  `yaml:"nodePort"`
 	ExtraArgs        []Arg  `yaml:"extraArgs"`
 }
 
@@ -116,6 +127,18 @@ type SchedulerConfig struct {
 
 // WebhookConfig contains configuration for the webhook.
 type WebhookConfig struct {
+	Image     string `yaml:"image"`
+	Replicas  int32  `yaml:"replicas"`
+	ExtraArgs []Arg  `yaml:"extraArgs"`
+}
+
+type AggregatedAPIServerConfig struct {
+	Image     string `yaml:"image"`
+	Replicas  int32  `yaml:"replicas"`
+	ExtraArgs []Arg  `yaml:"extraArgs"`
+}
+
+type KubeControllerManagerConfig struct {
 	Image     string `yaml:"image"`
 	Replicas  int32  `yaml:"replicas"`
 	ExtraArgs []Arg  `yaml:"extraArgs"`
