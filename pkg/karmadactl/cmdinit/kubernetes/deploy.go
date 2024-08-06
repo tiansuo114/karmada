@@ -731,7 +731,13 @@ func (i *CommandInitOption) parseInitConfig(cfg *initConfig.InitConfiguration) e
 	// General Config
 	setIfNotEmpty(&i.Namespace, cfg.GeneralConfig.Namespace)
 	setIfNotEmpty(&i.KubeConfig, cfg.GeneralConfig.KubeConfigPath)
+	setIfNotEmpty(&i.KubeImageRegistry, cfg.ImageConfig.KubeImageRegistry)
+	setIfNotEmpty(&i.KubeImageMirrorCountry, cfg.ImageConfig.KubeImageMirrorCountry)
 	setIfNotEmpty(&i.ImageRegistry, cfg.GeneralConfig.PrivateImageRegistry)
+	setIfNotEmpty(&i.ImagePullPolicy, cfg.ImageConfig.ImagePullPolicy)
+	if len(cfg.ImageConfig.ImagePullSecrets) != 0 {
+		i.PullSecrets = cfg.ImageConfig.ImagePullSecrets
+	}
 	setIfNotZero(&i.WaitComponentReadyTimeout, cfg.GeneralConfig.WaitComponentReadyTimeout)
 
 	// Certificate Config

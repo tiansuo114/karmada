@@ -123,6 +123,7 @@ type WebhookConfig struct {
 
 // ImageConfig contains configuration for images used in the cluster.
 type ImageConfig struct {
+	KubeImageTag           string   `yaml:"kubeImageTag"`
 	KubeImageRegistry      string   `yaml:"kubeImageRegistry"`
 	KubeImageMirrorCountry string   `yaml:"kubeImageMirrorCountry"`
 	ImagePullPolicy        string   `yaml:"imagePullPolicy"`

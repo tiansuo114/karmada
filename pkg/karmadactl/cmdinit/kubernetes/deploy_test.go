@@ -18,8 +18,6 @@ package kubernetes
 
 import (
 	"context"
-	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/config"
-	"github.com/stretchr/testify/assert"
 	"net"
 	"os"
 	"testing"
@@ -29,7 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
+	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/config"
 	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_initializeDirectory(t *testing.T) {
