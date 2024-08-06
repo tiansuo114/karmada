@@ -18,13 +18,14 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"sort"
+
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	yamlserializer "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/klog/v2"
-	"os"
-	"sort"
 )
 
 // LoadInitConfiguration loads the InitConfiguration from the specified file path.

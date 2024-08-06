@@ -17,9 +17,10 @@ limitations under the License.
 package config
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const testConfig = `
@@ -115,6 +116,13 @@ func TestLoadInitConfiguration(t *testing.T) {
 				NodeSelectorLabels: "karmada.io/etcd=true",
 				StorageMode:        "PVC",
 				Replicas:           3,
+			},
+			External: &ExternalEtcd{
+				ExternalCAPath:   "/etc/ssl/certs/ca-certificates.crt",
+				ExternalCertPath: "/path/to/your/certificate.pem",
+				ExternalKeyPath:  "/path/to/your/privatekey.pem",
+				ExternalServers:  "https://example.com:8443",
+				ExternalPrefix:   "ext-",
 			},
 		},
 		ControlPlaneConfig: ControlPlaneConfig{
