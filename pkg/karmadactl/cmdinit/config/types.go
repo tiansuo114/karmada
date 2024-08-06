@@ -132,12 +132,14 @@ type WebhookConfig struct {
 	ExtraArgs []Arg  `yaml:"extraArgs"`
 }
 
+// AggregatedAPIServerConfig contains configuration for the aggregated API server.
 type AggregatedAPIServerConfig struct {
 	Image     string `yaml:"image"`
 	Replicas  int32  `yaml:"replicas"`
 	ExtraArgs []Arg  `yaml:"extraArgs"`
 }
 
+// KubeControllerManagerConfig contains configuration for the kube-controller-manager.
 type KubeControllerManagerConfig struct {
 	Image     string `yaml:"image"`
 	Replicas  int32  `yaml:"replicas"`
