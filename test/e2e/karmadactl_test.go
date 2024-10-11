@@ -1251,7 +1251,7 @@ docker.io/karmada/karmada-aggregated-apiserver:v0.0.0-master`
 		})
 
 		ginkgo.It("list images with private-image-registry flag", func() {
-			cmdArgs = []string{"config", "show-images", "--private-image-registry=registry.k8s.io2"}
+			cmdArgs = []string{"init", "show-images", "--private-image-registry=registry.k8s.io2"}
 			expected = `registry.k8s.io2/kube-apiserver:v1.30.4
 registry.k8s.io2/kube-controller-manager:v1.30.4
 registry.k8s.io2/etcd:3.5.13-0
@@ -1268,7 +1268,7 @@ registry.k8s.io2/karmada-aggregated-apiserver:v0.0.0-master`
 		})
 
 		ginkgo.It("list images with kube-image-country flag", func() {
-			cmdArgs = []string{"config", "show-images", "--kube-image-country=cn"}
+			cmdArgs = []string{"init", "show-images", "--kube-image-country=cn"}
 			expected = `registry.cn-hangzhou.aliyuncs.com/google_containers/kube-apiserver:v1.30.4
 registry.cn-hangzhou.aliyuncs.com/google_containers/kube-controller-manager:v1.30.4
 registry.cn-hangzhou.aliyuncs.com/google_containers/etcd:3.5.13-0
@@ -1292,7 +1292,7 @@ docker.io/karmada/karmada-aggregated-apiserver:v0.0.0-master`
 		)
 
 		ginkgo.It("invalid flag --unknown-flag", func() {
-			cmdArgs = []string{"config", "show-images", "--unknown-flag"}
+			cmdArgs = []string{"init", "show-images", "--unknown-flag"}
 			expected = "unknown flag"
 
 			cmd := framework.NewKarmadactlCommand(kubeconfig, "", karmadactlPath, "", timeout, cmdArgs...)
