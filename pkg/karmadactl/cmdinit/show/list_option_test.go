@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package init_test
+package show_test
 
 import (
 	"io"
@@ -23,8 +23,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/init"
 	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/kubernetes"
+	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/show"
 )
 
 // Helper function to capture stdout
@@ -65,7 +65,7 @@ func TestCommandConfigImageOption(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			opts := init.CommandConfigImageOption{
+			opts := show.CommandConfigImageOption{
 				InitOption: kubernetes.NewDefaultCommandInitOption(),
 			}
 			opts.InitOption.ImageRegistry = tt.privateImageRegistry

@@ -21,8 +21,8 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	configInit "github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/init"
 	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/kubernetes"
+	configInit "github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/show"
 )
 
 var (
