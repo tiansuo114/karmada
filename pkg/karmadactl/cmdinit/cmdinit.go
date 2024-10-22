@@ -76,7 +76,9 @@ var (
 		%[1]s init --karmada-apiserver-replicas 3 --etcd-replicas 3 --etcd-storage-mode PVC --storage-classes-name {StorageClassesName}
 
 		# Specify external IPs(load balancer or HA IP) which used to sign the certificate
-		%[1]s init --cert-external-ip 10.235.1.2 --cert-external-dns www.karmada.io`)
+		%[1]s init --cert-external-ip 10.235.1.2 --cert-external-dns www.karmada.io
+		# Install Karmada using a configuration file
+        %[1]s init --init-config /path/to/your/config/file.yaml`)
 )
 
 // NewCmdInit install Karmada on Kubernetes
