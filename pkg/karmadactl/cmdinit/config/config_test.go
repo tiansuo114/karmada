@@ -54,6 +54,7 @@ spec:
        karmada.io/etcd: "true"
      pvcSize: "5Gi"
      replicas: 3
+     storageClassesName: "fast"
      storageMode: "PVC"
    external:
      endpoints:
@@ -167,7 +168,8 @@ func TestLoadInitConfiguration(t *testing.T) {
 					NodeSelectorLabels: map[string]string{
 						"karmada.io/etcd": "true",
 					},
-					StorageMode: "PVC",
+					StorageClassesName: "fast",
+					StorageMode:        "PVC",
 				},
 				External: &ExternalEtcd{
 					Endpoints: []string{

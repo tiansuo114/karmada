@@ -128,6 +128,10 @@ type LocalEtcd struct {
 	// StorageMode is the storage mode for Etcd (e.g., emptyDir, hostPath, PVC)
 	// +optional
 	StorageMode string `json:"storageMode,omitempty" yaml:"storageMode,omitempty"`
+
+	// StorageClassesName is the name of the storage class for the Etcd PVC
+	// +optional
+	StorageClassesName string `json:"storageClassesName,omitempty" yaml:"storageClassesName,omitempty"`
 }
 
 // ExternalEtcd defines the configuration of an external Etcd cluster

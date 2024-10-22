@@ -859,6 +859,7 @@ func (i *CommandInitOption) parseLocalEtcdConfig(localEtcd *initConfig.LocalEtcd
 	}
 
 	setIfNotEmpty(&i.EtcdStorageMode, localEtcd.StorageMode)
+	setIfNotEmpty(&i.StorageClassesName, localEtcd.StorageClassesName)
 	setIfNotZeroInt32(&i.EtcdReplicas, localEtcd.Replicas)
 }
 

@@ -585,7 +585,8 @@ func TestParseInitConfig(t *testing.T) {
 					NodeSelectorLabels: map[string]string{
 						"key": "value",
 					},
-					StorageMode: "PVC",
+					StorageClassesName: "fast",
+					StorageMode:        "PVC",
 				},
 				External: &config.ExternalEtcd{
 					CAFile:    "/etc/ssl/certs/ca-certificates.crt",
@@ -689,6 +690,7 @@ func TestParseInitConfig(t *testing.T) {
 	assert.Equal(t, "/data/dir", opt.EtcdHostDataPath)
 	assert.Equal(t, "5Gi", opt.EtcdPersistentVolumeSize)
 	assert.Equal(t, "key=value", opt.EtcdNodeSelectorLabels)
+	assert.Equal(t, "fast", opt.StorageClassesName)
 	assert.Equal(t, "PVC", opt.EtcdStorageMode)
 	assert.Equal(t, int32(3), opt.EtcdReplicas)
 	assert.Equal(t, "apiserver-image:latest", opt.KarmadaAPIServerImage)
