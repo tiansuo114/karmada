@@ -268,6 +268,76 @@ func NewCertConfig(cn string, org []string, altNames certutil.AltNames, notAfter
 	}
 }
 
+func NewGenCerts(pkiPath, caCertFile, caKeyFile string, certConfigMap map[string]*CertsConfig) error {
+	// Main CA (karmada CA)
+	caCert, caKey, err := getCACertAndKey(caCertFile, caKeyFile)
+	if err != nil {
+		return err
+	}
+	if err = WriteCertAndKey(pkiPath, globaloptions.CaCertAndKeyName, caCert, caKey); err != nil {
+		return err
+	}
+
+	// Front-proxy CA
+	frontProxyCaCert, frontProxyCaKey, err := NewCACertAndKey(options.FrontProxyCaCertAndKeyName)
+	if err != nil {
+		return err
+	}
+	if err = WriteCertAndKey(pkiPath, options.FrontProxyCaCertAndKeyName, frontProxyCaCert, frontProxyCaKey); err != nil {
+		return err
+	}
+
+	// Etcd CA
+	etcdCaCert, etcdCaKey, err := NewCACertAndKey(options.EtcdCaCertAndKeyName)
+	if err != nil {
+		return err
+	}
+	if err = WriteCertAndKey(pkiPath, options.EtcdCaCertAndKeyName, etcdCaCert, etcdCaKey); err != nil {
+		return err
+	}
+
+	// Choose signing CA by cert name
+	for certName, certConfig := range certConfigMap {
+		if certConfig == nil {
+			continue
+		}
+
+		var signerCACert *x509.Certificate
+		var signerCAKey crypto.Signer
+
+		switch certName {
+		// etcd server/client and all etcd-client variants should be signed by etcd-ca
+		case options.EtcdServerCertAndKeyName,
+			options.EtcdClientCertAndKeyName,
+			options.KarmadaApiServerEtcdClientCertAndKeyName,
+			options.KarmadaAggregatedApiServerEtcdClientCertAndKeyName,
+			options.KarmadaSearchEtcdClientCertAndKeyName:
+			signerCACert = etcdCaCert
+			signerCAKey = *etcdCaKey
+
+		// front-proxy client should be signed by front-proxy-ca
+		case options.FrontProxyClientCertAndKeyName:
+			signerCACert = frontProxyCaCert
+			signerCAKey = *frontProxyCaKey
+
+		// default: signed by main karmada CA
+		default:
+			signerCACert = caCert
+			signerCAKey = *caKey
+		}
+
+		cert, key, err := NewCertAndKey(signerCACert, signerCAKey, certConfig)
+		if err != nil {
+			return err
+		}
+		if err = WriteCertAndKey(pkiPath, certName, cert, &key); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // GenCerts Create CA certificate and sign etcd karmada certificate.
 func GenCerts(pkiPath, caCertFile, caKeyFile string, etcdServerCertCfg, etcdClientCertCfg, karmadaCertCfg, apiserverCertCfg, frontProxyClientCertCfg *CertsConfig) error {
 	caCert, caKey, err := getCACertAndKey(caCertFile, caKeyFile)
@@ -331,7 +401,7 @@ func getCACertAndKey(caCertFile, caKeyFile string) (caCert *x509.Certificate, ca
 		key := certificate.PrivateKey.(crypto.Signer)
 		caKey = &key
 	} else {
-		caCert, caKey, err = NewCACertAndKey("karmada")
+		caCert, caKey, err = NewCACertAndKey(options.KarmadaCertAndKeyName)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -340,7 +410,7 @@ func getCACertAndKey(caCertFile, caKeyFile string) (caCert *x509.Certificate, ca
 }
 
 func genEtcdCerts(pkiPath string, etcdServerCertCfg, etcdClientCertCfg *CertsConfig) error {
-	etcdCaCert, etcdCaKey, err := NewCACertAndKey("etcd-ca")
+	etcdCaCert, etcdCaKey, err := NewCACertAndKey(options.EtcdCaCertAndKeyName)
 	if err != nil {
 		return err
 	}

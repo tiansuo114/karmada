@@ -18,6 +18,8 @@ package cert
 
 import (
 	"crypto/sha256"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net"
@@ -29,6 +31,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
 
+	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/options"
 	"github.com/karmada-io/karmada/pkg/karmadactl/cmdinit/utils"
 	"github.com/karmada-io/karmada/pkg/util/names"
 )
@@ -188,4 +191,150 @@ func compareCertFilesInDirs(dir1, dir2, filename string) (bool, error) {
 	file1 := filepath.Join(dir1, filename)
 	file2 := filepath.Join(dir2, filename)
 	return compareFiles(file1, file2)
+}
+
+// TestNewGenCerts_FullSet_Issuer verifies that NewGenCerts generates the full
+// set of certificates akin to kubernetes.Init(), and more importantly, that
+// etcd and front-proxy client certificates are signed by their specific CAs
+// (etcd-ca and front-proxy-ca), while the rest are signed by the main karmada CA.
+func TestNewGenCerts_FullSet_Issuer(t *testing.T) { //nolint:funlen
+	tmpDir := "./test-new-gen-certs-full"
+	defer os.RemoveAll(tmpDir)
+
+	notAfter := time.Now().Add(Duration365d * 2).UTC()
+
+	// Build AltNames helpers similar to kubernetes.Init()
+	namespace := names.NamespaceKarmadaSystem
+	hostClusterDomain := "cluster.local"
+	externalDNS := "example.com"
+	externalIP := "1.2.3.4"
+	karmadaAPIServerIPs := []net.IP{utils.StringToNetIP("1.2.3.5")}
+
+	buildDefaultAltNames := func(componentName string) certutil.AltNames {
+		dns := []string{
+			fmt.Sprintf("%s.karmada-system.svc", componentName),
+			fmt.Sprintf("%s.karmada-system.svc.cluster.local", componentName),
+			fmt.Sprintf("%s.%s.svc.%s", componentName, namespace, hostClusterDomain),
+			"localhost",
+		}
+		dns = append(dns, utils.FlagsDNS(externalDNS)...)
+
+		ips := []net.IP{utils.StringToNetIP("127.0.0.1")}
+		ips = append(ips, utils.FlagsIP(externalIP)...)
+		ips = append(ips, karmadaAPIServerIPs...)
+		if ip, err := utils.InternetIP(); err == nil {
+			ips = append(ips, ip)
+		}
+		return certutil.AltNames{DNSNames: dns, IPs: ips}
+	}
+
+	// etcd server SANs (for 3 replicas) similar to kubernetes buildEtcdCertConfig
+	buildEtcdServerAltNames := func(replicas int) certutil.AltNames {
+		dns := []string{"localhost"}
+		for i := 0; i < replicas; i++ {
+			dns = append(dns, fmt.Sprintf("%s-%d.%s.%s.svc.%s", "etcd", i, "etcd", namespace, hostClusterDomain))
+		}
+		return certutil.AltNames{DNSNames: dns, IPs: []net.IP{utils.StringToNetIP("127.0.0.1")}}
+	}
+
+	// Compose the full cert config map akin to kubernetes.Init()
+	certConfigMap := map[string]*CertsConfig{}
+
+	// etcd
+	certConfigMap[options.EtcdServerCertAndKeyName] = NewCertConfig(options.KarmadaEtcdServerCN, []string{}, buildEtcdServerAltNames(3), &notAfter)
+	certConfigMap[options.EtcdClientCertAndKeyName] = NewCertConfig(options.KarmadaEtcdClientCN, []string{""}, certutil.AltNames{}, &notAfter)
+
+	// karmada-apiserver
+	certConfigMap[options.KarmadaApiServerCertAndKeyName] = NewCertConfig(options.KarmadaApiServerCN, []string{}, buildDefaultAltNames("karmada-apiserver"), &notAfter)
+	certConfigMap[options.KarmadaApiServerEtcdClientCertAndKeyName] = NewCertConfig(options.KarmadaApiServerEtcdClientCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+	certConfigMap[options.FrontProxyClientCertAndKeyName] = NewCertConfig(options.KarmadaFrontProxyClientCN, []string{}, certutil.AltNames{}, &notAfter)
+
+	// aggregated-apiserver
+	certConfigMap[options.KarmadaAggregatedApiServerCertAndKeyName] = NewCertConfig(options.KarmadaAggregatedApiServerCN, []string{}, buildDefaultAltNames(names.KarmadaAggregatedAPIServerComponentName), &notAfter)
+	certConfigMap[options.KarmadaAggregatedApiServerClientCertAndKeyName] = NewCertConfig(options.KarmadaAggregatedApiServerCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+	certConfigMap[options.KarmadaAggregatedApiServerEtcdClientCertAndKeyName] = NewCertConfig(options.KarmadaAggregatedApiServerEtcdClientCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+
+	// webhook
+	certConfigMap[options.KarmadaWebhookCertAndKeyName] = NewCertConfig(options.KarmadaWebhookCN, []string{}, buildDefaultAltNames(names.KarmadaWebhookComponentName), &notAfter)
+	certConfigMap[options.KarmadaWebhookClientCertAndKeyName] = NewCertConfig(options.KarmadaWebhookCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+
+	// search
+	certConfigMap[options.KarmadaSearchCertAndKeyName] = NewCertConfig(options.KarmadaSearchCN, []string{}, buildDefaultAltNames(names.KarmadaSearchComponentName), &notAfter)
+	certConfigMap[options.KarmadaSearchClientCertAndKeyName] = NewCertConfig(options.KarmadaSearchCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+	certConfigMap[options.KarmadaSearchEtcdClientCertAndKeyName] = NewCertConfig(options.KarmadaSearchEtcdClientCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+
+	// controller-manager client
+	certConfigMap[options.KarmadaControllerManagerClientCertAndKeyName] = NewCertConfig(options.KarmadaControllerManagerCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+
+	// scheduler (client + grpc)
+	certConfigMap[options.KarmadaSchedulerGrpcCertAndKeyName] = NewCertConfig(options.KarmadaSchedulerGrpcCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+	certConfigMap[options.KarmadaSchedulerClientCertAndKeyName] = NewCertConfig(options.KarmadaSchedulerCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+
+	// descheduler (client + grpc)
+	certConfigMap[options.KarmadaDeschedulerClientCertAndKeyName] = NewCertConfig(options.KarmadaDeschedulerCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+	certConfigMap[options.KarmadaDeschedulerGrpcCertAndKeyName] = NewCertConfig(options.KarmadaDeschedulerGrpcCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+
+	if err := NewGenCerts(tmpDir, "", "", certConfigMap); err != nil {
+		t.Fatalf("NewGenCerts failed: %v", err)
+	}
+
+	// Expected basic CA files
+	caFiles := []string{
+		"ca.crt", "ca.key",
+		"front-proxy-ca.crt", "front-proxy-ca.key",
+		"etcd-ca.crt", "etcd-ca.key",
+	}
+	if err := checkCertFiles(tmpDir, caFiles); err != nil {
+		t.Fatal(err)
+	}
+
+	// Validate each generated cert exists and is issued by the correct CA
+	expectedIssuer := func(name string) string {
+		switch name {
+		case options.EtcdServerCertAndKeyName,
+			options.EtcdClientCertAndKeyName,
+			options.KarmadaApiServerEtcdClientCertAndKeyName,
+			options.KarmadaAggregatedApiServerEtcdClientCertAndKeyName,
+			options.KarmadaSearchEtcdClientCertAndKeyName:
+			return options.EtcdCaCertAndKeyName
+		case options.FrontProxyClientCertAndKeyName:
+			return options.FrontProxyCaCertAndKeyName
+		default:
+			// fallback main CA created by getCACertAndKey() uses CN "karmada"
+			return "karmada"
+		}
+	}
+
+	for name := range certConfigMap {
+		// files exist
+		if err := checkCertFiles(tmpDir, []string{fmt.Sprintf("%s.crt", name), fmt.Sprintf("%s.key", name)}); err != nil {
+			t.Fatalf("expected cert/key for %s missing: %v", name, err)
+		}
+		// issuer correctness
+		issuerCN, err := readCertIssuerCN(filepath.Join(tmpDir, fmt.Sprintf("%s.crt", name)))
+		if err != nil {
+			t.Fatalf("parse cert %s failed: %v", name, err)
+		}
+		want := expectedIssuer(name)
+		if issuerCN != want {
+			t.Fatalf("issuer mismatch for %s: got %s, want %s", name, issuerCN, want)
+		}
+	}
+}
+
+// readCertIssuerCN reads a PEM certificate and returns Issuer.CommonName
+func readCertIssuerCN(path string) (string, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	block, _ := pem.Decode(b)
+	if block == nil {
+		return "", fmt.Errorf("failed to decode PEM for %s", path)
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return "", err
+	}
+	return cert.Issuer.CommonName, nil
 }

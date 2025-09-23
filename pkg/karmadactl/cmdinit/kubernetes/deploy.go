@@ -58,12 +58,40 @@ var (
 	certList = []string{
 		globaloptions.CaCertAndKeyName,
 		options.EtcdCaCertAndKeyName,
+		options.FrontProxyCaCertAndKeyName,
+
+		options.KarmadaApiServerCertAndKeyName,
+		options.KarmadaApiServerClientCertAndKeyName,
+		options.KarmadaApiServerEtcdClientCertAndKeyName,
+		options.FrontProxyClientCertAndKeyName,
+
+		options.KarmadaAggregatedApiServerCertAndKeyName,
+		options.KarmadaAggregatedApiServerClientCertAndKeyName,
+		options.KarmadaAggregatedApiServerEtcdClientCertAndKeyName,
+
+		options.KarmadaWebhookCertAndKeyName,
+		options.KarmadaWebhookClientCertAndKeyName,
+
+		options.KarmadaSearchCertAndKeyName,
+		options.KarmadaSearchClientCertAndKeyName,
+		options.KarmadaSearchEtcdClientCertAndKeyName,
+
+		options.KarmadaMetricsAdapterCertAndKeyName,
+		options.KarmadaMetricsAdapterClientCertAndKeyName,
+
+		options.KarmadaSchedulerEstimatorCertAndKeyName,
+		options.KarmadaSchedulerEstimatorClientCertAndKeyName,
+
 		options.EtcdServerCertAndKeyName,
 		options.EtcdClientCertAndKeyName,
-		options.KarmadaCertAndKeyName,
-		options.ApiserverCertAndKeyName,
-		options.FrontProxyCaCertAndKeyName,
-		options.FrontProxyClientCertAndKeyName,
+
+		options.KarmadaControllerManagerClientCertAndKeyName,
+
+		options.KarmadaSchedulerClientCertAndKeyName,
+		options.KarmadaSchedulerGrpcCertAndKeyName,
+
+		options.KarmadaDeschedulerClientCertAndKeyName,
+		options.KarmadaDeschedulerGrpcCertAndKeyName,
 	}
 
 	karmadaConfigList = []string{
@@ -75,6 +103,40 @@ var (
 		util.KarmadaConfigName(names.KarmadaMetricsAdapterComponentName),
 		util.KarmadaConfigName(names.KarmadaSearchComponentName),
 		util.KarmadaConfigName(names.KarmadaWebhookComponentName),
+	}
+
+	certConfigMap = map[string]*cert.CertsConfig{
+		// Server certificates
+		options.KarmadaApiServerCertAndKeyName:           nil,
+		options.KarmadaAggregatedApiServerCertAndKeyName: nil,
+		options.KarmadaWebhookCertAndKeyName:             nil,
+		options.KarmadaSearchCertAndKeyName:              nil,
+		options.KarmadaMetricsAdapterCertAndKeyName:      nil,
+		options.KarmadaSchedulerEstimatorCertAndKeyName:  nil,
+		options.EtcdServerCertAndKeyName:                 nil,
+
+		// Client certificates
+		options.KarmadaApiServerClientCertAndKeyName:           nil,
+		options.KarmadaAggregatedApiServerClientCertAndKeyName: nil,
+		options.KarmadaWebhookClientCertAndKeyName:             nil,
+		options.KarmadaSearchClientCertAndKeyName:              nil,
+		options.KarmadaMetricsAdapterClientCertAndKeyName:      nil,
+		options.KarmadaSchedulerEstimatorClientCertAndKeyName:  nil,
+		options.KarmadaControllerManagerClientCertAndKeyName:   nil,
+		options.KarmadaSchedulerClientCertAndKeyName:           nil,
+		options.KarmadaDeschedulerClientCertAndKeyName:         nil,
+
+		// ETCD client certificates
+		options.KarmadaApiServerEtcdClientCertAndKeyName:           nil,
+		options.KarmadaAggregatedApiServerEtcdClientCertAndKeyName: nil,
+		options.KarmadaSearchEtcdClientCertAndKeyName:              nil,
+		options.EtcdClientCertAndKeyName:                           nil,
+
+		// GRPC client certificates
+		options.KarmadaSchedulerGrpcCertAndKeyName:   nil,
+		options.KarmadaDeschedulerGrpcCertAndKeyName: nil,
+
+		options.FrontProxyClientCertAndKeyName: nil,
 	}
 
 	emptyByteSlice                 = make([]byte, 0)
@@ -450,8 +512,32 @@ func (i *CommandInitOption) prepareCRD() error {
 }
 
 func (i *CommandInitOption) createCertsSecrets() error {
+	// todo: 根据karmadaConfigList找到对应的数个cert,生成对应的secret
+
 	// Create karmada-config Secret
 	karmadaServerURL := fmt.Sprintf("https://%s.%s.svc.%s:%v", karmadaAPIServerDeploymentAndServiceName, i.Namespace, i.HostClusterDomain, karmadaAPIServerContainerPort)
+	for _, karmadaConfigSecretName := range karmadaConfigList {
+		switch karmadaConfigSecretName {
+		case util.KarmadaConfigName(names.KarmadaAggregatedAPIServerComponentName):
+
+		case util.KarmadaConfigName(names.KarmadaControllerManagerComponentName):
+
+		case util.KarmadaConfigName(names.KubeControllerManagerComponentName):
+
+		case util.KarmadaConfigName(names.KarmadaSchedulerComponentName):
+
+		case util.KarmadaConfigName(names.KarmadaDeschedulerComponentName):
+
+		case util.KarmadaConfigName(names.KarmadaMetricsAdapterComponentName):
+
+		case util.KarmadaConfigName(names.KarmadaSearchComponentName):
+
+		case util.KarmadaConfigName(names.KarmadaWebhookComponentName):
+
+		default:
+		}
+	}
+
 	config := utils.CreateWithCerts(karmadaServerURL, options.UserName, options.UserName, i.CertAndKeyFileData[fmt.Sprintf("%s.crt", globaloptions.CaCertAndKeyName)],
 		i.CertAndKeyFileData[fmt.Sprintf("%s.key", options.KarmadaCertAndKeyName)], i.CertAndKeyFileData[fmt.Sprintf("%s.crt", options.KarmadaCertAndKeyName)])
 	configBytes, err := clientcmd.Write(*config)
@@ -677,6 +763,191 @@ func (i *CommandInitOption) createKarmadaConfig() error {
 	}
 	klog.Info("Create karmada kubeconfig success.")
 	return err
+}
+
+func (i *CommandInitOption) Init() error {
+	// build cert config
+	i.buildEtcdCertConfig()
+	i.buildKarmadaApiServerCertConfig()
+	i.buildKarmadaAggregatedAPIServerCertConfig()
+	i.buildKarmadaWebhookCertConfig()
+	i.buildKarmadaSearchCertConfig()
+	i.buildKarmadaControllerManagerCertConfig()
+	i.buildKarmadaSchedulerCertConfig()
+	i.buildKarmadaDeschedulerCertConfig()
+
+	err := cert.NewGenCerts(i.KarmadaPkiPath, i.CaCertFile, i.CaKeyFile, certConfigMap)
+	if err != nil {
+		return fmt.Errorf("failed to generate certificates: %v", err)
+	}
+	return nil
+}
+
+// buildEtcdCertConfig populates certConfigMap entries for local ETCD:
+// - etcd server certificate with DNS for each statefulset pod and 127.0.0.1
+// - etcd client certificate for components that talk to etcd directly
+func (i *CommandInitOption) buildEtcdCertConfig() {
+	notAfter := time.Now().Add(i.CertValidity).UTC()
+	if !i.isExternalEtcdProvided() {
+		etcdServerCertDNS := []string{
+			"localhost",
+		}
+		for number := int32(0); number < i.EtcdReplicas; number++ {
+			etcdServerCertDNS = append(etcdServerCertDNS, fmt.Sprintf("%s-%v.%s.%s.svc.%s",
+				etcdStatefulSetAndServiceName, number, etcdStatefulSetAndServiceName, i.Namespace, i.HostClusterDomain))
+		}
+		etcdServerAltNames := certutil.AltNames{
+
+			DNSNames: etcdServerCertDNS,
+			IPs:      []net.IP{utils.StringToNetIP("127.0.0.1")},
+		}
+		certConfigMap[options.EtcdServerCertAndKeyName] = cert.NewCertConfig(options.KarmadaEtcdServerCN, []string{}, etcdServerAltNames, &notAfter)
+		certConfigMap[options.EtcdClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaEtcdClientCN, []string{""}, certutil.AltNames{}, &notAfter)
+	}
+}
+
+// buildKarmadaApiServerCertConfig populates certConfigMap entries for karmada-apiserver:
+// - Server certificate for karmada-apiserver with SANs
+// - Admin-style client certificate (karmada) with org system:masters for bootstrapping and SA signing
+// - etcd client certificate used by karmada-apiserver
+// - front-proxy client certificate used by aggregator/front-proxy
+func (i *CommandInitOption) buildKarmadaApiServerCertConfig() {
+	notAfter := time.Now().Add(i.CertValidity).UTC()
+	karmadaApiServerAltNames := i.buildDefaultAlterNames(karmadaAPIServerDeploymentAndServiceName)
+	certConfigMap[options.KarmadaApiServerCertAndKeyName] = cert.NewCertConfig(options.KarmadaApiServerCN, []string{}, karmadaApiServerAltNames, &notAfter)
+	certConfigMap[options.KarmadaApiServerEtcdClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaApiServerEtcdClientCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+	certConfigMap[options.FrontProxyClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaFrontProxyClientCN, []string{}, certutil.AltNames{}, &notAfter)
+}
+
+// buildKarmadaAggregatedAPIServerCertConfig populates certConfigMap entries for karmada-aggregated-apiserver:
+// - Server certificate with SANs for the aggregated apiserver service
+// - Client and etcd-client certificates (org: system:masters)
+func (i *CommandInitOption) buildKarmadaAggregatedAPIServerCertConfig() {
+	notAfter := time.Now().Add(i.CertValidity).UTC()
+	karmadaAggregatedAPIServerAltNames := i.buildDefaultAlterNames(options.KarmadaAggregatedApiServerCertAndKeyName)
+	// Server certificate for karmada-aggregated-apiserver
+	certConfigMap[options.KarmadaAggregatedApiServerCertAndKeyName] = cert.NewCertConfig(options.KarmadaAggregatedApiServerCN, []string{}, karmadaAggregatedAPIServerAltNames, &notAfter)
+	// Client certificate used by karmada-aggregated-apiserver when talking to karmada-apiserver
+	certConfigMap[options.KarmadaAggregatedApiServerClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaAggregatedApiServerCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+	// ETCD client certificate used by karmada-aggregated-apiserver
+	certConfigMap[options.KarmadaAggregatedApiServerEtcdClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaAggregatedApiServerEtcdClientCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+}
+
+// buildWebhookCertConfig populates certConfigMap entries for karmada-webhook:
+// - Server certificate with SANs for the webhook service name and cluster domain
+// - Client certificate to talk to karmada-apiserver (org: system:masters)
+func (i *CommandInitOption) buildKarmadaWebhookCertConfig() {
+	notAfter := time.Now().Add(i.CertValidity).UTC()
+	webhookAltNames := i.buildDefaultAlterNames(webhookDeploymentAndServiceAccountAndServiceName)
+	certConfigMap[options.KarmadaWebhookCertAndKeyName] = cert.NewCertConfig(options.KarmadaWebhookCN, []string{}, webhookAltNames, &notAfter)
+	certConfigMap[options.KarmadaWebhookClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaWebhookCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+}
+
+// buildSearchCertConfig populates certConfigMap entries for karmada-search:
+// - Server certificate with SANs for the search service
+// - Client and ETCD client certificates (org: system:masters)
+func (i *CommandInitOption) buildKarmadaSearchCertConfig() {
+	notAfter := time.Now().Add(i.CertValidity).UTC()
+	searchAltNames := i.buildDefaultAlterNames(names.KarmadaSearchComponentName)
+	certConfigMap[options.KarmadaSearchCertAndKeyName] = cert.NewCertConfig(options.KarmadaSearchCN, []string{}, searchAltNames, &notAfter)
+	certConfigMap[options.KarmadaSearchClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaSearchCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+	certConfigMap[options.KarmadaSearchEtcdClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaSearchEtcdClientCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+}
+
+// buildMetricsAdapterCertConfig populates certConfigMap entries for karmada-metrics-adapter:
+// - Server certificate with SANs for the adapter service
+// - Client certificate (org: system:masters)
+func (i *CommandInitOption) buildKarmadaMetricsAdapterCertConfig() {
+	notAfter := time.Now().Add(i.CertValidity).UTC()
+	metricsAltNames := i.buildDefaultAlterNames(names.KarmadaMetricsAdapterComponentName)
+	certConfigMap[options.KarmadaMetricsAdapterCertAndKeyName] = cert.NewCertConfig(options.KarmadaMetricsAdapterCN, []string{}, metricsAltNames, &notAfter)
+	certConfigMap[options.KarmadaMetricsAdapterClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaMetricsAdapterCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+}
+
+// buildSchedulerEstimatorCertConfig populates certConfigMap entry for karmada-scheduler-estimator server certificate.
+// Follows deploy-karmada.sh by using wildcard DNS to cover per-member estimator services, plus localhost/127.0.0.1.
+func (i *CommandInitOption) buildKarmadaSchedulerEstimatorCertConfig() {
+	notAfter := time.Now().Add(i.CertValidity).UTC()
+	dnsNames := []string{
+		"*.karmada-system.svc.cluster.local",
+		"*.karmada-system.svc",
+		fmt.Sprintf("*.%s.svc.%s", i.Namespace, i.HostClusterDomain),
+		"localhost",
+	}
+	ips := []net.IP{utils.StringToNetIP("127.0.0.1")}
+	dnsNames = append(dnsNames, utils.FlagsDNS(i.ExternalDNS)...)
+	ips = append(
+		ips,
+		utils.FlagsIP(i.ExternalIP)...,
+	)
+	ips = append(ips, i.KarmadaAPIServerIP...)
+	internetIP, err := utils.InternetIP()
+	if err != nil {
+		klog.Warningln("Failed to obtain internet IP. ", err)
+	} else {
+		ips = append(ips, internetIP)
+	}
+
+	alt := certutil.AltNames{
+		DNSNames: dnsNames,
+		IPs:      ips,
+	}
+	certConfigMap[options.KarmadaSchedulerEstimatorCertAndKeyName] = cert.NewCertConfig(options.KarmadaSchedulerEstimatorCN, []string{}, alt, &notAfter)
+	// Client certificate used by the estimator to talk to karmada-apiserver
+	certConfigMap[options.KarmadaSchedulerEstimatorClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaSchedulerEstimatorCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+}
+
+// buildControllerManagerClientCertConfig populates certConfigMap entry for karmada-controller-manager client certificate.
+// The certificate is used by controller-manager to talk to the karmada-apiserver (org: system:masters).
+func (i *CommandInitOption) buildKarmadaControllerManagerCertConfig() {
+	notAfter := time.Now().Add(i.CertValidity).UTC()
+	certConfigMap[options.KarmadaControllerManagerClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaControllerManagerCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+}
+
+// buildSchedulerClientCertConfig populates certConfigMap entry for karmada-scheduler client certificate.
+// The certificate is used by scheduler to talk to the karmada-apiserver (org: system:masters).
+func (i *CommandInitOption) buildKarmadaSchedulerCertConfig() {
+	notAfter := time.Now().Add(i.CertValidity).UTC()
+	certConfigMap[options.KarmadaSchedulerGrpcCertAndKeyName] = cert.NewCertConfig(options.KarmadaSchedulerGrpcCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+	certConfigMap[options.KarmadaSchedulerClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaSchedulerCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+}
+
+// buildDeschedulerClientCertConfig populates certConfigMap entry for karmada-descheduler client certificate.
+// The certificate is used by descheduler to talk to the karmada-apiserver (org: system:masters).
+func (i *CommandInitOption) buildKarmadaDeschedulerCertConfig() {
+	notAfter := time.Now().Add(i.CertValidity).UTC()
+	certConfigMap[options.KarmadaDeschedulerClientCertAndKeyName] = cert.NewCertConfig(options.KarmadaDeschedulerCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+	certConfigMap[options.KarmadaDeschedulerGrpcCertAndKeyName] = cert.NewCertConfig(options.KarmadaDeschedulerGrpcCN, []string{"system:masters"}, certutil.AltNames{}, &notAfter)
+}
+
+// buildDefaultAlterNames builds a standard AltNames set for in-cluster service endpoints
+// of a given component, plus localhost and optional external DNS/IPs.
+func (i *CommandInitOption) buildDefaultAlterNames(componentName string) certutil.AltNames {
+	defaultDNS := []string{
+		fmt.Sprintf("%s.karmada-system.svc", componentName),
+		fmt.Sprintf("%s.karmada-system.svc.cluster.local", componentName),
+		fmt.Sprintf("%s.%s.svc.%s", componentName, i.Namespace, i.HostClusterDomain),
+		"localhost",
+	}
+	defaultDNS = append(defaultDNS, utils.FlagsDNS(i.ExternalDNS)...)
+
+	defaultIPs := []net.IP{utils.StringToNetIP("127.0.0.1")}
+	defaultIPs = append(
+		defaultIPs,
+		utils.FlagsIP(i.ExternalIP)...,
+	)
+	defaultIPs = append(defaultIPs, i.KarmadaAPIServerIP...)
+	internetIP, err := utils.InternetIP()
+	if err != nil {
+		klog.Warningln("Failed to obtain internet IP. ", err)
+	} else {
+		defaultIPs = append(defaultIPs, internetIP)
+	}
+
+	return certutil.AltNames{
+		DNSNames: defaultDNS,
+		IPs:      defaultIPs,
+	}
 }
 
 // get kube components registry
